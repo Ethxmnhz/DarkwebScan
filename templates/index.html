@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawler Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Crawl Dashboard</h1>
+
+        <div class="form-section">
+            <label for="onion-url">Enter .onion URL:</label>
+            <input type="text" id="onion-url" placeholder="http://example.onion">
+            
+            <label for="crawl-depth">Crawl Depth:</label>
+            <input type="number" id="crawl-depth" value="3">
+            
+            <button onclick="startCrawl()">Start Crawl</button>
+        </div>
+
+        <div class="stats-section">
+            <h2>Statistics</h2>
+            <p>Pages visited: <span id="pages-visited">0</span></p>
+            <p>Links found: <span id="links-found">0</span></p>
+        </div>
+
+        <div class="logs-section">
+            <h2>Live Logs</h2>
+            <div id="logs"></div>
+        </div>
+
+        <!-- New section for live link list and visited pages -->
+        <div class="links-section">
+            <h2>Live Pages and Links</h2>
+            <div id="live-links">
+                <h3>Pages Visited:</h3>
+                <ul id="visited-pages-list"></ul>
+                <h3>Links Found:</h3>
+                <ul id="found-links-list"></ul>
+            </div>
+        </div>
+
+        <div class="sitemap-section">
+            <h2>Sitemap Tree</h2>
+            <div id="sitemap-tree"></div>
+        </div>
+    </div>
+
+    <script>
+        function startCrawl() {
+            const onionUrl = document.getElementById('onion-url').value;
+            const depth = document.getElementById('crawl-depth').value;
+            const eventSource = new EventSource(`/start_crawl?url=${onionUrl}&depth=${depth}`);
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                // Live Logs
+                if (data.log) {
+                    const logElement = document.createElement('p');
+                    logElement.textContent = data.log;
+                    document.getElementById('logs').appendChild(logElement);
+                }
+
+                // Update Visited Pages and Found Links
+                if (data.url && !data.parent_id) {
+                    const pageElement = document.createElement('li');
+                    pageElement.textContent = data.url;
+                    document.getElementById('visited-pages-list').appendChild(pageElement);
+                } else if (data.url && data.parent_id) {
+                    const linkElement = document.createElement('li');
+                    linkElement.textContent = data.url;
+                    document.getElementById('found-links-list').appendChild(linkElement);
+                }
+
+                // No links found on the page
+                if (data.no_links) {
+                    const noLinkMsg = document.createElement('p');
+                    noLinkMsg.textContent = `No links found on: ${data.url}`;
+                    document.getElementById('logs').appendChild(noLinkMsg);
+                }
+            };
+
+            // Update Stats periodically
+            setInterval(() => {
+                fetch('/stats')
+                    .then(response => response.json())
+                    .then(stats => {
+                        document.getElementById('pages-visited').textContent = stats.pages_visited;
+                        document.getElementById('links-found').textContent = stats.links_found;
+                    });
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
